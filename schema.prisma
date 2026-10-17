@@ -1,0 +1,179 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// NOTE: SQLite (Prisma 5) has no enums, so these fields are Strings.
+// The allowed values live in src/constants.js. When you move to MySQL you can
+// turn them into real enums.
+
+model Department {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+}
+
+model User {
+  id                 Int                   @id @default(autoincrement())
+  email              String                @unique
+  passwordHash       String
+  role               String                // STUDENT, FACULTY, HOD, SECURITY, PLACEMENT, ADMIN
+  status             String                @default("PENDING") // PENDING, ACTIVE, REJECTED, SUSPENDED
+  suspensionReason   String?               // shown to security when entry is denied
+  biometricConsentAt DateTime?             // when the person agreed to face data being stored
+  departmentId       Int?
+  department         Department?           @relation(fields: [departmentId], references: [id])
+  studentProfile     StudentProfile?
+  staffProfile       StaffProfile?
+  enrollmentPhotos   EnrollmentPhoto[]
+  faceEmbeddings     FaceEmbedding[]
+  accessLogs         AccessLog[]
+  refreshTokens      RefreshToken[]
+  submittedRequests  VerificationRequest[] @relation("SubmittedRequests")
+  reviewedRequests   VerificationRequest[] @relation("ReviewedRequests")
+  auditLogs          AuditLog[]
+  createdAt          DateTime              @default(now())
+  updatedAt          DateTime              @updatedAt
+
+  @@index([role, status])
+}
+
+model StudentProfile {
+  id       Int     @id @default(autoincrement())
+  prn      String  @unique
+  name     String
+  division String?
+  year     String?
+  phone    String?
+  photoUrl String?
+  userId   Int     @unique
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model StaffProfile {
+  id     Int     @id @default(autoincrement())
+  name   String
+  phone  String?
+  userId Int     @unique
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// One row per photo taken at enrolment (front, left, right...).
+model EnrollmentPhoto {
+  id            Int            @id @default(autoincrement())
+  userId        Int
+  user          User           @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filePath      String
+  angle         String         @default("FRONT") // FRONT, LEFT, RIGHT
+  width         Int?
+  height        Int?
+  brightness    Float?         // measured by the server, not trusted from the browser
+  sharpness     Float?
+  qualityStatus String         @default("PENDING") // PENDING, ACCEPTED, REJECTED
+  rejectReason  String?        // e.g. NO_FACE, MULTIPLE_FACES, BLURRY, TOO_DARK
+  embedding     FaceEmbedding?
+  createdAt     DateTime       @default(now())
+
+  @@index([userId])
+}
+
+// The numeric "face fingerprint" that gets compared at the gate.
+// Raw photos can be deleted after enrolment; embeddings are what matching uses.
+model FaceEmbedding {
+  id        Int              @id @default(autoincrement())
+  userId    Int
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  photoId   Int?             @unique
+  photo     EnrollmentPhoto? @relation(fields: [photoId], references: [id], onDelete: SetNull)
+  vector    Bytes            // 512 float32 values = 2048 bytes
+  dim       Int              @default(512)
+  modelName String           // which model made it, e.g. "arcface-r100". Never mix models.
+  isActive  Boolean          @default(true)
+  createdAt DateTime         @default(now())
+
+  @@index([userId, isActive])
+}
+
+// A physical entry point with its own camera/kiosk.
+model Gate {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique
+  location   String?
+  apiKeyHash String      // SHA-256 of the key the kiosk sends; the key itself is never stored
+  isActive   Boolean     @default(true)
+  lastSeenAt DateTime?
+  accessLogs AccessLog[]
+  createdAt  DateTime    @default(now())
+}
+
+// Every entry attempt, allowed or denied. Separate from AuditLog (admin actions).
+model AccessLog {
+  id           Int      @id @default(autoincrement())
+  userId       Int?     // null when no one was recognised
+  user         User?    @relation(fields: [userId], references: [id], onDelete: SetNull)
+  gateId       Int?
+  gate         Gate?    @relation(fields: [gateId], references: [id], onDelete: SetNull)
+  direction    String   @default("IN")   // IN, OUT
+  method       String   @default("FACE") // FACE, MANUAL_PRN
+  decision     String                    // ALLOW, DENY
+  reason       String?                   // NO_FACE, NO_MATCH, LOW_QUALITY, LIVENESS_FAILED, SUSPENDED, INACTIVE
+  confidence   Float?                    // similarity score of the best match
+  snapshotPath String?                   // photo taken at the gate (delete after a retention period)
+  createdAt    DateTime @default(now())
+
+  @@index([userId, createdAt])
+  @@index([gateId, createdAt])
+  @@index([createdAt])
+}
+
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  hashed    String
+  expiry    DateTime
+  revoked   Boolean  @default(false)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+model VerificationRequest {
+  id          Int               @id @default(autoincrement())
+  type        String            // STUDENT_REGISTRATION, STAFF_REGISTRATION, ID_VERIFICATION, PROFILE_UPDATE
+  status      String            @default("PENDING") // PENDING, APPROVED, REJECTED
+  submittedBy Int
+  submitter   User              @relation("SubmittedRequests", fields: [submittedBy], references: [id])
+  reviewedBy  Int?
+  reviewer    User?             @relation("ReviewedRequests", fields: [reviewedBy], references: [id])
+  remarks     String?
+  reviewedAt  DateTime?
+  documents   RequestDocument[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+model RequestDocument {
+  id        Int                 @id @default(autoincrement())
+  requestId Int
+  request   VerificationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  filePath  String
+  mime      String
+  size      Int
+  createdAt DateTime            @default(now())
+}
+
+// Admin/staff actions (approvals, role changes). Gate entries go to AccessLog.
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  actorId   Int?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String
+  entity    String
+  entityId  Int?
+  ip        String?
+  metadata  String?  // JSON string
+  createdAt DateTime @default(now())
+}

@@ -1,0 +1,183 @@
+{
+  "openapi": "3.0.0",
+  "info": {
+    "title": "Smart Verification System API",
+    "version": "1.0.0",
+    "description": "API documentation for gate entry, face verification, OTP email auth, and administration."
+  },
+  "servers": [
+    {
+      "url": "http://localhost:5000/api/v1",
+      "description": "Local server"
+    }
+  ],
+  "components": {
+    "securitySchemes": {
+      "bearerAuth": {
+        "type": "http",
+        "scheme": "bearer",
+        "bearerFormat": "JWT"
+      }
+    }
+  },
+  "paths": {
+    "/auth/register": {
+      "post": {
+        "summary": "Register a new user & send OTP",
+        "tags": ["Auth"],
+        "responses": { "201": { "description": "OTP sent" }, "400": { "description": "Validation error" } }
+      }
+    },
+    "/auth/verify-otp": {
+      "post": {
+        "summary": "Verify OTP for registration",
+        "tags": ["Auth"],
+        "responses": { "200": { "description": "Verified" }, "400": { "description": "Invalid OTP" } }
+      }
+    },
+    "/auth/resend-otp": {
+      "post": {
+        "summary": "Resend OTP",
+        "tags": ["Auth"],
+        "responses": { "200": { "description": "OTP resent" } }
+      }
+    },
+    "/auth/login": {
+      "post": {
+        "summary": "User login (returns access and refresh tokens)",
+        "tags": ["Auth"],
+        "responses": { "200": { "description": "Success" } }
+      }
+    },
+    "/auth/refresh": {
+      "post": {
+        "summary": "Rotate refresh token & issue new access token",
+        "tags": ["Auth"],
+        "responses": { "200": { "description": "Refreshed" } }
+      }
+    },
+    "/auth/logout": {
+      "post": {
+        "summary": "Revoke refresh token and logout",
+        "tags": ["Auth"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Logged out" } }
+      }
+    },
+    "/auth/forgot-password": {
+      "post": {
+        "summary": "Request password reset OTP",
+        "tags": ["Auth"],
+        "responses": { "200": { "description": "OTP sent" } }
+      }
+    },
+    "/auth/reset": {
+      "post": {
+        "summary": "Reset password using OTP",
+        "tags": ["Auth"],
+        "responses": { "200": { "description": "Password reset successfully" } }
+      }
+    },
+    "/users/me": {
+      "get": {
+        "summary": "Get logged in user profile",
+        "tags": ["Users"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Profile data" } }
+      }
+    },
+    "/users/{id}": {
+      "put": {
+        "summary": "Update user profile",
+        "tags": ["Users"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Updated" } }
+      }
+    },
+    "/users/{id}/password": {
+      "post": {
+        "summary": "Change password",
+        "tags": ["Users"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Changed" } }
+      }
+    },
+    "/photos/enroll": {
+      "post": {
+        "summary": "Enroll student face photo and compute descriptor",
+        "tags": ["Photos"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Enrolled" } }
+      }
+    },
+    "/photos": {
+      "get": {
+        "summary": "List enrollment photos",
+        "tags": ["Photos"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Photos list" } }
+      }
+    },
+    "/photos/{id}": {
+      "delete": {
+        "summary": "Delete enrollment photo",
+        "tags": ["Photos"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Deleted" } }
+      }
+    },
+    "/verification/request": {
+      "post": {
+        "summary": "Submit gate verification request",
+        "tags": ["Verification"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "201": { "description": "Created" } }
+      }
+    },
+    "/verification/requests": {
+      "get": {
+        "summary": "List verification requests",
+        "tags": ["Verification"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "List" } }
+      }
+    },
+    "/verification/verify-face": {
+      "post": {
+        "summary": "Verify live face against enrolled face descriptor",
+        "tags": ["Verification"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Match result" } }
+      }
+    },
+    "/gate/scan": {
+      "post": {
+        "summary": "Security guard scan PRN + optional live face",
+        "tags": ["Gate Control"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Access decision" } }
+      }
+    },
+    "/gate/logs": {
+      "get": {
+        "summary": "View gate entry access logs",
+        "tags": ["Gate Control"],
+        "security": [{ "bearerAuth": [] }],
+        "responses": { "200": { "description": "Access logs" } }
+      }
+    },
+    "/departments": {
+      "get": { "summary": "List departments", "tags": ["Departments"], "security": [{ "bearerAuth": [] }] },
+      "post": { "summary": "Create department", "tags": ["Departments"], "security": [{ "bearerAuth": [] }] }
+    },
+    "/admin/users": {
+      "get": { "summary": "Admin: List all users", "tags": ["Admin"], "security": [{ "bearerAuth": [] }] }
+    },
+    "/admin/stats": {
+      "get": { "summary": "Admin: Get system statistics", "tags": ["Admin"], "security": [{ "bearerAuth": [] }] }
+    },
+    "/admin/audit-logs": {
+      "get": { "summary": "Admin: Get audit logs", "tags": ["Admin"], "security": [{ "bearerAuth": [] }] }
+    }
+  }
+}

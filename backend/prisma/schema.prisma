@@ -1,0 +1,162 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+// ------------------------------- Department --------------------------------
+model Department {
+  id    Int    @id @default(autoincrement())
+  name  String @unique
+  users User[]
+}
+
+// ------------------------------------ User ---------------------------------
+model User {
+  id               Int               @id @default(autoincrement())
+  email            String            @unique
+  passwordHash     String
+  role             String            // student | faculty | admin | security
+  status           String            @default("ACTIVE") // ACTIVE | SUSPENDED | INACTIVE
+  isVerified       Boolean           @default(false)
+  emailVerifiedAt  DateTime?
+  departmentId     Int?
+  department       Department?       @relation(fields: [departmentId], references: [id])
+  studentProfile   StudentProfile?
+  staffProfile     StaffProfile?
+  enrollmentPhotos EnrollmentPhoto[]
+  refreshTokens    RefreshToken[]
+  submittedRequests VerificationRequest[] @relation("SubmittedRequests")
+  reviewedRequests  VerificationRequest[] @relation("ReviewedRequests")
+  auditLogs        AuditLog[]
+  accessLogs       AccessLog[]
+  createdAt        DateTime          @default(now())
+  updatedAt        DateTime          @updatedAt
+}
+
+// ------------------------------- StudentProfile ----------------------------
+model StudentProfile {
+  id       Int     @id @default(autoincrement())
+  prn      String  @unique
+  name     String
+  division String?
+  year     String?
+  phone    String?
+  photoUrl String?
+  userId   Int     @unique
+  user     User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// -------------------------------- StaffProfile -----------------------------
+model StaffProfile {
+  id     Int     @id @default(autoincrement())
+  name   String
+  phone  String?
+  userId Int     @unique
+  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+// ------------------------------- EnrollmentPhoto --------------------------
+model EnrollmentPhoto {
+  id            Int      @id @default(autoincrement())
+  userId        Int
+  user          User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  filePath      String
+  mime          String   @default("image/jpeg")
+  size          Int      @default(0)
+  qualityStatus String   @default("ACCEPTED") // PENDING | ACCEPTED | REJECTED
+  descriptor    String?  // JSON-encoded Float32Array (128 floats)
+  createdAt     DateTime @default(now())
+}
+
+// -------------------------------- RefreshToken -----------------------------
+model RefreshToken {
+  id        Int      @id @default(autoincrement())
+  hashed    String
+  expiry    DateTime
+  revoked   Boolean  @default(false)
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  createdAt DateTime @default(now())
+}
+
+// ----------------------------------- Otp ----------------------------------
+model Otp {
+  id        Int      @id @default(autoincrement())
+  email     String
+  otpHash   String   // SHA-256 hash of the OTP (never store plain)
+  purpose   String   // REGISTER | PASSWORD_RESET
+  attempts  Int      @default(0)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+}
+
+model EmailOtp {
+  id         Int       @id @default(autoincrement())
+  userId     Int?
+  email      String
+  purpose    String
+  codeHash   String
+  expiresAt  DateTime
+  attempts   Int       @default(0)
+  consumedAt DateTime?
+  createdAt  DateTime  @default(now())
+  @@index([email, purpose, createdAt])
+}
+
+// --------------------------- VerificationRequest --------------------------
+model VerificationRequest {
+  id          Int               @id @default(autoincrement())
+  userId      Int
+  user        User              @relation("SubmittedRequests", fields: [userId], references: [id])
+  purpose     String
+  notes       String?
+  status      String            @default("PENDING") // PENDING | APPROVED | REJECTED
+  reviewedBy  Int?
+  reviewer    User?             @relation("ReviewedRequests", fields: [reviewedBy], references: [id])
+  remarks     String?
+  reviewedAt  DateTime?
+  documents   RequestDocument[]
+  createdAt   DateTime          @default(now())
+  updatedAt   DateTime          @updatedAt
+}
+
+// ------------------------------- RequestDocument --------------------------
+model RequestDocument {
+  id        Int                 @id @default(autoincrement())
+  requestId Int
+  request   VerificationRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+  filePath  String
+  mime      String
+  size      Int
+  createdAt DateTime            @default(now())
+}
+
+// ----------------------------------- AuditLog -----------------------------
+model AuditLog {
+  id        Int      @id @default(autoincrement())
+  actorId   Int?
+  actor     User?    @relation(fields: [actorId], references: [id])
+  action    String   // e.g. STATUS_CHANGE, ROLE_CHANGE, USER_DELETE, FACE_MATCH
+  entity    String
+  entityId  Int?
+  ip        String?
+  metadata  String?  // JSON string
+  createdAt DateTime @default(now())
+}
+
+// ----------------------------------- AccessLog -----------------------------
+model AccessLog {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  user      User     @relation(fields: [userId], references: [id])
+  grantedBy Int?
+  method    String   // PRN | FACE | QR
+  granted   Boolean
+  ip        String?
+  metadata  String?  // JSON (e.g. face distance)
+  createdAt DateTime @default(now())
+}
