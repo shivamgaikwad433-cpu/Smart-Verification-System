@@ -1,4 +1,5 @@
 <<<<<<< HEAD
+<<<<<<< HEAD
 # React + Vite
 
 This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
@@ -18,3 +19,6 @@ If you are developing a production application, we recommend using TypeScript wi
 =======
 # Smart-Verification-System
 >>>>>>> a7b395e1b109534b73617565a256c0cc571600b2
+=======
+# Smart-Verification-System
+>>>>>>> a28c26b14595b5ee558d72dd355c712a6cf184d8
