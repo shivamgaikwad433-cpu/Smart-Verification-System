@@ -1,6 +1,8 @@
 import axiosClient from './axiosClient';
 
 export const facultyApi = {
+  getStudentApprovals: () => axiosClient.get('/verification/student-approvals'),
+  reviewStudentApproval: (id, status) => axiosClient.patch(`/verification/student-approvals/${id}`, { status }),
   getClasses: async () => {
     return axiosClient.get('/faculty/classes');
   },

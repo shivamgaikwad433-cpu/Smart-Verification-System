@@ -1,6 +1,7 @@
 import axios from 'axios';
 
-const BASE_URL = import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api/v1' : 'http://localhost:5000/api/v1');
+// Same-origin API is the default so a single deployed service can host both UI and API.
+const BASE_URL = import.meta.env.VITE_API_URL || '/api/v1';
 
 // In-memory token storage reference
 let memoryToken = null;

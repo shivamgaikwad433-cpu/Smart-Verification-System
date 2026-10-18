@@ -154,6 +154,26 @@ async function sendPasswordResetEmail(to, otp) {
   });
 }
 
+async function sendStudentApprovalNotification(to, student, config = {}) {
+  const subject = 'Student registration approval required - Smart Verification System';
+  const appUrl = (process.env.APP_URL || '').trim().replace(/\/$/, '');
+  const approvalLink = appUrl ? `<p><a href="${escapeHtml(appUrl)}/faculty">Open the HOD approval dashboard</a></p>` : '<p>Open the deployed Smart Verification System and sign in to the faculty dashboard to review this request.</p>';
+  const html = `<div style="font-family:Arial,sans-serif;max-width:560px;margin:auto;padding:24px;color:#0f172a"><h2>Student registration needs your approval</h2><p>A student has completed email verification and is waiting for HOD approval.</p><table style="border-collapse:collapse"><tr><td style="padding:6px 16px 6px 0;color:#64748b">Name</td><td>${escapeHtml(student.name)}</td></tr><tr><td style="padding:6px 16px 6px 0;color:#64748b">PRN</td><td>${escapeHtml(student.prn)}</td></tr><tr><td style="padding:6px 16px 6px 0;color:#64748b">Department</td><td>${escapeHtml(student.department || 'Not provided')}</td></tr><tr><td style="padding:6px 16px 6px 0;color:#64748b">Email</td><td>${escapeHtml(student.email)}</td></tr></table>${approvalLink}<p>The student cannot sign in or use gate verification until you approve.</p></div>`;
+
+  if (config.EMAIL_DRIVER === 'console') {
+    console.log(`[HOD APPROVAL NOTICE] To: ${to}; Student: ${student.name} (${student.prn})`);
+    return { messageId: `dev-notice-${Date.now()}` };
+  }
+  if (config.EMAIL_DRIVER === 'resend') return sendViaResend(to, subject, html, config);
+
+  const mailer = getTransporter(config);
+  return mailer.sendMail({ from: `"Smart Verification System" <${config.EMAIL_FROM || config.EMAIL_USER}>`, to, subject, html });
+}
+
+function escapeHtml(value = '') {
+  return String(value).replace(/[&<>"']/g, (character) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[character]);
+}
+
 async function verifyEmailService(config = {}) {
   if (config.EMAIL_DRIVER === 'console') {
     console.log('Email service ready (console driver — emails will only be logged to terminal)');
@@ -180,4 +200,4 @@ async function verifyEmailService(config = {}) {
   }
 }
 
-module.exports = { sendOtpEmail, sendPasswordResetEmail, verifyEmailService };
+module.exports = { sendOtpEmail, sendPasswordResetEmail, sendStudentApprovalNotification, verifyEmailService };

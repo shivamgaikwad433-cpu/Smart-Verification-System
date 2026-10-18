@@ -77,8 +77,10 @@ export const Login = () => {
   // Camera Management - STRICTLY OFF BY DEFAULT FOR PRIVACY
   const [cameraActive, setCameraActive] = useState(false);
   const [cameraError, setCameraError] = useState(null);
+  const [cameraFacingMode, setCameraFacingMode] = useState('user');
   const videoRef = useRef(null);
   const mediaStreamRef = useRef(null);
+  const restartCameraAfterSwitchRef = useRef(false);
 
   // Credentials Fallback
   const [credEmail, setCredEmail] = useState('');
@@ -117,7 +119,8 @@ export const Login = () => {
     try {
       if (navigator.mediaDevices && navigator.mediaDevices.getUserMedia) {
         const stream = await navigator.mediaDevices.getUserMedia({
-          video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 } },
+          video: { facingMode: { ideal: cameraFacingMode }, width: { ideal: 640 }, height: { ideal: 480 } },
+          audio: false,
         });
         mediaStreamRef.current = stream;
         // Set cameraActive=true FIRST so React renders the <video> element into the DOM.
@@ -129,8 +132,8 @@ export const Login = () => {
       }
     } catch (err) {
       console.warn('Camera error:', err);
-      setCameraError('Webcam access was denied or hardware not found. Running simulated camera mode.');
-      setCameraActive(true); // Allow simulation so user can still test without webcam
+      setCameraError(err.message || 'Webcam access was denied or hardware not found.');
+      setCameraActive(false);
     }
   };
 
@@ -146,6 +149,13 @@ export const Login = () => {
     setCameraActive(false);
   };
 
+  const switchRegistrationCamera = (mode) => {
+    if (mode === cameraFacingMode) return;
+    restartCameraAfterSwitchRef.current = cameraActive;
+    if (cameraActive) stopCamera();
+    setCameraFacingMode(mode);
+  };
+
   // KEY FIX: After cameraActive becomes true, the <video> element is now in the DOM.
   // Attach the stream to videoRef and play it here, after React has re-rendered.
   useEffect(() => {
@@ -154,6 +164,13 @@ export const Login = () => {
       videoRef.current.play().catch((e) => console.warn('Video play error:', e));
     }
   }, [cameraActive]);
+
+  useEffect(() => {
+    if (restartCameraAfterSwitchRef.current) {
+      restartCameraAfterSwitchRef.current = false;
+      startCamera();
+    }
+  }, [cameraFacingMode]);
 
   // Helper to grab frame from live video canvas
   const grabVideoFrame = () => {
@@ -345,10 +362,10 @@ export const Login = () => {
       });
 
       if (response && response.success) {
-        setRegSuccessUser(response.user || { ...regForm, photoUrl: scan1Photo });
+        setRegSuccessUser({ ...(response.user || { ...regForm, photoUrl: scan1Photo }), approvalPending: Boolean(response.approvalPending) });
         setRegStep(3);
         stopCamera();
-        showToast('Email verified! Registration completed successfully.', 'success');
+        showToast(response.approvalPending ? 'Email verified. Waiting for department approval.' : 'Email verified! Registration completed successfully.', 'success');
       } else {
         showToast(response?.message || 'Could not send verification OTP. Check backend connection.', 'error');
       }
@@ -379,14 +396,15 @@ export const Login = () => {
           role: regForm.role || 'student',
           department: regForm.department,
           photoUrl: scan1Photo || regForm.photoUrl,
-          status: 'Active',
-          gateStatus: 'Allowed',
+          status: result.approvalPending ? 'PENDING' : 'Active',
+          gateStatus: result.approvalPending ? 'Denied' : 'Allowed',
         };
+        verifiedUser.approvalPending = Boolean(result.approvalPending);
         // Ensure photo is attached for dashboard display
         verifiedUser.photoUrl = scan1Photo || regForm.photoUrl || verifiedUser.photoUrl;
         setRegSuccessUser(verifiedUser);
         setRegStep(3); // REGISTRATION COMPLETE!
-        showToast('OTP Verified! Registration completed & stored in database.', 'success');
+        showToast(result.approvalPending ? 'OTP verified. Waiting for department approval.' : 'OTP Verified! Registration completed & stored in database.', 'success');
       } else {
         showToast(result?.message || 'Invalid or expired OTP. Please try again.', 'error');
       }
@@ -1081,6 +1099,23 @@ export const Login = () => {
                         </Badge>
                       </div>
 
+                      <div className="flex items-center justify-between gap-3 py-2">
+                        <span className="text-[11px] font-semibold text-slate-500">Camera</span>
+                        <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5" aria-label="Choose registration camera">
+                          {[['user', 'Front camera'], ['environment', 'Back camera']].map(([mode, label]) => (
+                            <button
+                              key={mode}
+                              type="button"
+                              onClick={() => switchRegistrationCamera(mode)}
+                              aria-pressed={cameraFacingMode === mode}
+                              className={`px-2.5 py-1.5 rounded-md text-[11px] font-semibold transition-colors ${cameraFacingMode === mode ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'}`}
+                            >
+                              {label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+
                       {/* Video Camera Viewport */}
                       {!cameraActive && regScanPass < 3 ? (
                         <div className="rounded-xl overflow-hidden bg-black aspect-4/3 max-h-60 w-full flex flex-col items-center justify-center text-center p-6 border border-slate-800">
@@ -1093,6 +1128,11 @@ export const Login = () => {
                           <p className="text-[11px] text-slate-400 max-w-xs mb-3.5">
                             Click below to open your camera and capture the 2 required security angles.
                           </p>
+                          {cameraError && (
+                            <p role="alert" className="text-[11px] text-rose-300 max-w-xs mb-3">
+                              {cameraError} Choose Back camera only if this device has a rear camera.
+                            </p>
+                          )}
                           <button
                             type="button"
                             onClick={startCamera}
@@ -1391,10 +1431,10 @@ export const Login = () => {
                     </div>
                     <div>
                       <h4 className="font-bold text-sm sm:text-base tracking-tight">
-                        Registration &amp; Verification Complete!
+                        {regSuccessUser.approvalPending ? 'Registration Submitted for Approval' : 'Registration &amp; Verification Complete!'}
                       </h4>
                       <p className="text-xs opacity-85 mt-0.5">
-                        Your account, mobile number, and dual camera scans are verified and stored in the database.
+                        {regSuccessUser.approvalPending ? 'Your email and face scans are verified. A teacher or HOD must approve your registration before you can sign in or use campus access verification.' : 'Your account, mobile number, and dual camera scans are verified and stored in the database.'}
                       </p>
                     </div>
                   </div>
@@ -1410,8 +1450,8 @@ export const Login = () => {
                         <span className="font-bold text-slate-900 text-base">
                           {regSuccessUser.name}
                         </span>
-                        <Badge variant="success" size="sm">
-                          Verified &amp; Active
+                        <Badge variant={regSuccessUser.approvalPending ? 'warning' : 'success'} size="sm">
+                          {regSuccessUser.approvalPending ? 'Pending Approval' : 'Verified &amp; Active'}
                         </Badge>
                       </div>
                       <div className="text-xs text-slate-500 font-mono mt-0.5">
@@ -1424,6 +1464,11 @@ export const Login = () => {
                   </div>
 
                   <div className="space-y-2.5 pt-2">
+                    {regSuccessUser.approvalPending ? (
+                      <Button variant="secondary" size="lg" onClick={() => { setRegStep(1); setActiveTab('credentials'); setCredEmail(regSuccessUser.email); }} className="w-full py-3 text-sm font-semibold tracking-wide">
+                        Return to Sign In
+                      </Button>
+                    ) : <>
                     <Button
                       variant="primary"
                       size="lg"
@@ -1449,6 +1494,7 @@ export const Login = () => {
                     >
                       Test College Entry Gate Scanner with New Face
                     </Button>
+                    </>}
                   </div>
                 </div>
               )}

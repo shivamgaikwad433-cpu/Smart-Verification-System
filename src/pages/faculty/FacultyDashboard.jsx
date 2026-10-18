@@ -24,6 +24,8 @@ export const FacultyDashboard = () => {
   const [classes, setClasses] = useState([]);
   const [selectedClassId, setSelectedClassId] = useState('');
   const [history, setHistory] = useState([]);
+  const [studentApprovals, setStudentApprovals] = useState([]);
+  const [approvalBusy, setApprovalBusy] = useState(null);
   const [loading, setLoading] = useState(true);
 
   // Capture flow states: 'select' | 'upload' | 'review' | 'submitted'
@@ -58,6 +60,23 @@ export const FacultyDashboard = () => {
     };
     fetchData();
   }, []);
+
+  useEffect(() => {
+    facultyApi.getStudentApprovals().then((result) => setStudentApprovals(result.requests || [])).catch(() => {});
+  }, []);
+
+  const reviewStudent = async (requestId, status) => {
+    setApprovalBusy(requestId);
+    try {
+      await facultyApi.reviewStudentApproval(requestId, status);
+      setStudentApprovals((items) => items.filter((item) => item.id !== requestId));
+      showToast(status === 'APPROVED' ? 'Student approved. Campus access verification is enabled.' : 'Student registration rejected.', status === 'APPROVED' ? 'success' : 'info');
+    } catch (error) {
+      showToast(error.message || 'Could not review student registration.', 'error');
+    } finally {
+      setApprovalBusy(null);
+    }
+  };
 
   const selectedClass = classes.find((c) => c.id === selectedClassId) || classes[0];
 
@@ -191,6 +210,31 @@ export const FacultyDashboard = () => {
 
   return (
     <div className="space-y-8 pb-12">
+      <section className="bg-white rounded-2xl border border-slate-200 p-5 shadow-xs space-y-4">
+        <div>
+          <h2 className="text-sm font-semibold text-slate-900">Student Registration Approvals</h2>
+          <p className="text-xs text-slate-500 mt-1">Review new students in your department. Approval enables their gate face verification.</p>
+        </div>
+        {studentApprovals.length === 0 ? <p className="text-xs text-slate-500">No pending student registrations.</p> : (
+          <div className="space-y-3">
+            {studentApprovals.map((request) => {
+              const student = request.user?.studentProfile;
+              const photo = request.user?.enrollmentPhotos?.[0]?.filePath;
+              return <div key={request.id} className="flex flex-col sm:flex-row sm:items-center gap-3 border border-slate-100 rounded-xl p-3">
+                {photo && <img src={photo} alt="Student enrollment" className="w-12 h-12 rounded-lg object-cover" />}
+                <div className="flex-1 min-w-0">
+                  <div className="text-sm font-semibold text-slate-900">{student?.name || request.user?.email}</div>
+                  <div className="text-xs text-slate-500">{student?.prn} · {request.user?.department?.name} · {request.user?.email}</div>
+                </div>
+                <div className="flex gap-2">
+                  <Button size="sm" variant="secondary" loading={approvalBusy === request.id} onClick={() => reviewStudent(request.id, 'REJECTED')}>Reject</Button>
+                  <Button size="sm" variant="primary" loading={approvalBusy === request.id} onClick={() => reviewStudent(request.id, 'APPROVED')}>Approve</Button>
+                </div>
+              </div>;
+            })}
+          </div>
+        )}
+      </section>
       {/* 1. Class Selection and Quick Overview */}
       <section className="bg-white rounded-xl border border-slate-200/80 p-5 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">

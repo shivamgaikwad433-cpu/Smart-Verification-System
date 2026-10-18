@@ -107,12 +107,19 @@ model EmailOtp {
   @@index([email, purpose, createdAt])
 }
 
+model SystemSetting {
+  key       String   @id
+  value     String
+  updatedAt DateTime @updatedAt
+}
+
 // --------------------------- VerificationRequest --------------------------
 model VerificationRequest {
   id          Int               @id @default(autoincrement())
   userId      Int
   user        User              @relation("SubmittedRequests", fields: [userId], references: [id])
   purpose     String
+  assignedToEmail String?
   notes       String?
   status      String            @default("PENDING") // PENDING | APPROVED | REJECTED
   reviewedBy  Int?

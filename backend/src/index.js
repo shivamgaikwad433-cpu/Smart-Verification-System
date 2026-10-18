@@ -74,6 +74,15 @@ app.use('/api/v1/departments',  departmentRoutes);
 // Health check
 app.get('/api/health', (req, res) => res.json({ success: true, message: 'API is running', ts: new Date().toISOString() }));
 
+// Serve the Vite build from this service when deployed as a single web app.
+const webDist = path.resolve(__dirname, '../../dist');
+app.use(express.static(webDist));
+app.get(/^(?!\/api(?:\/|$)|\/docs(?:\/|$)).*/, (req, res, next) => {
+  res.sendFile(path.join(webDist, 'index.html'), (error) => {
+    if (error) next(error);
+  });
+});
+
 // 404 handler
 app.use((req, res) => res.status(404).json({ success: false, message: `Route ${req.method} ${req.path} not found` }));
 

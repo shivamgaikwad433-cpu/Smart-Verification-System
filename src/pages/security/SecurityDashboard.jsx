@@ -70,7 +70,7 @@ export const SecurityDashboard = () => {
   };
 
   const student = verificationResult?.student;
-  const isAllowed = student?.gateStatus === 'Allowed' || student?.status === 'Active';
+  const isAllowed = student?.gateStatus === 'Allowed';
 
   return (
     <div className="max-w-2xl mx-auto py-4 sm:py-8 space-y-6">
@@ -209,7 +209,7 @@ export const SecurityDashboard = () => {
                       ) : (
                         <>
                           <ShieldAlert className="w-4 h-4" />
-                          <span>ACCESS DENIED (SUSPENDED)</span>
+                          <span>ACCESS DENIED</span>
                         </>
                       )}
                     </span>

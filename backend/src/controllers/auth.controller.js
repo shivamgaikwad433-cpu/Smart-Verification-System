@@ -3,12 +3,13 @@ const prisma = new PrismaClient();
 const bcrypt  = require('bcrypt');
 const jwt     = require('jsonwebtoken');
 const crypto  = require('crypto');
-const { sendOtpEmail, sendPasswordResetEmail } = require('../services/email.service');
+const { sendOtpEmail, sendPasswordResetEmail, sendStudentApprovalNotification } = require('../services/email.service');
 const { signAccess, signRefresh } = require('../utils/token');
 const { z } = require('zod');
 const { assertEmailProof, sendEmailOtp } = require('../services/otp.service');
 const { computeDescriptor, matchDescriptors } = require('../services/faceEngine.service');
 const { loadConfig } = require('../config');
+const { getStudentApproverEmail } = require('../services/approvalRouting.service');
 
 // -- Schemas --------------------------------------------------------------------
 const registerSchema = z.object({
@@ -92,8 +93,8 @@ async function register(req, res) {
         email,
         passwordHash,
         role: userRole,
-        status: 'ACTIVE',
-        isVerified: false,
+        status: userRole === 'student' ? 'PENDING' : 'ACTIVE',
+        isVerified: Boolean(emailVerifyToken),
         emailVerifiedAt: emailVerifyToken ? new Date() : null,
         departmentId: dept?.id ?? null,
       },
@@ -141,6 +142,15 @@ async function register(req, res) {
       console.warn(`[Email OTP] ${error.code || 'EMAIL_SEND_FAILED'}: ${error.message}`);
     }
     return res.status(201).json({ success: true, otpSent, email: fullUser.email, user: { id: fullUser.id, email: fullUser.email, name, role: userRole }, message: otpSent ? 'Registration started. Verification code sent.' : 'Registration created. Please configure email and resend the verification code.' });
+  }
+  if (userRole === 'student') {
+    await prisma.user.update({ where: { id: fullUser.id }, data: { status: 'PENDING' } });
+    const assignedToEmail = await getStudentApproverEmail();
+    const pendingRequest = await prisma.verificationRequest.findFirst({ where: { userId: fullUser.id, purpose: 'STUDENT_REGISTRATION' } });
+    if (!pendingRequest) await prisma.verificationRequest.create({ data: { userId: fullUser.id, purpose: 'STUDENT_REGISTRATION', assignedToEmail, notes: 'New student account approval' } });
+    else await prisma.verificationRequest.update({ where: { id: pendingRequest.id }, data: { assignedToEmail } });
+    sendStudentApprovalNotification(assignedToEmail, { name, prn: fullUser.studentProfile?.prn || prn, department, email }, loadConfig()).catch((error) => console.warn(`[HOD approval email] ${error.code || error.message}`));
+    return res.status(201).json({ success: true, approvalPending: true, message: 'Email verified. Your registration is waiting for faculty or HOD approval.', user: { id: fullUser.id, email: fullUser.email, name, role: userRole, status: 'PENDING', gateStatus: 'Denied' } });
   }
   const accessToken = signAccess(fullUser);
   const refreshToken = signRefresh(fullUser);
@@ -318,6 +328,16 @@ async function verifyOtp(req, res) {
     include: { studentProfile: true, staffProfile: true, department: true },
   });
 
+  if (fullUser.role === 'student') {
+    await prisma.user.update({ where: { id: fullUser.id }, data: { status: 'PENDING' } });
+    const assignedToEmail = await getStudentApproverEmail();
+    const existingRequest = await prisma.verificationRequest.findFirst({ where: { userId: fullUser.id, purpose: 'STUDENT_REGISTRATION' } });
+    if (!existingRequest) await prisma.verificationRequest.create({ data: { userId: fullUser.id, purpose: 'STUDENT_REGISTRATION', assignedToEmail, notes: 'New student account approval' } });
+    else await prisma.verificationRequest.update({ where: { id: existingRequest.id }, data: { assignedToEmail } });
+    sendStudentApprovalNotification(assignedToEmail, { name: fullUser.studentProfile?.name, prn: fullUser.studentProfile?.prn, department: fullUser.department?.name, email }, loadConfig()).catch((error) => console.warn(`[HOD approval email] ${error.code || error.message}`));
+    return res.json({ success: true, approvalPending: true, message: 'Email verified. Your registration is waiting for faculty or HOD approval.', user: { id: fullUser.id, email: fullUser.email, role: fullUser.role, name: fullUser.studentProfile?.name, prn: fullUser.studentProfile?.prn, status: 'PENDING', gateStatus: 'Denied' } });
+  }
+
   const accessToken  = signAccess(fullUser);
   const refreshToken = signRefresh(fullUser);
 
@@ -402,6 +422,7 @@ async function login(req, res) {
   }
 
   if (!user.emailVerifiedAt) return res.status(403).json({ success: false, code: 'EMAIL_NOT_VERIFIED', message: 'Please verify your email before signing in.' });
+  if (user.role === 'student' && user.status !== 'ACTIVE') return res.status(403).json({ success: false, code: 'APPROVAL_PENDING', message: user.status === 'SUSPENDED' ? 'Your registration was not approved. Contact your department.' : 'Your email is verified. Please wait for faculty or HOD approval before signing in.' });
   if (loadConfig().REQUIRE_LOGIN_OTP) {
     try {
       const otp = await sendEmailOtp(email, 'LOGIN', { userId: user.id, config: loadConfig() });

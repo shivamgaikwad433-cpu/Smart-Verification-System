@@ -20,15 +20,31 @@ const QUALITY_CHECK_INTERVAL_MS = 500;
  * lighting/sharpness check fails.
  */
 export function FaceCapture({ title, instruction, onCapture, onRetake, disabled = false, showDebug = false }) {
-  const { videoRef, status, error, start, stop, capture } = useCamera();
+  const [facingMode, setFacingMode] = useState('user');
+  const { videoRef, status, error, start, stop, capture } = useCamera({ facingMode });
   const [quality, setQuality] = useState(null); // { ok, issues, brightness, sharpness }
   const [captured, setCaptured] = useState(null); // { previewUrl, ... }
   const [capturing, setCapturing] = useState(false);
   const [captureError, setCaptureError] = useState(null);
   const scratchCanvasRef = useRef(null);
   const capturedUrlRef = useRef(null);
+  const restartAfterSwitchRef = useRef(false);
 
   const isActive = status === 'active';
+
+  useEffect(() => {
+    if (restartAfterSwitchRef.current) {
+      restartAfterSwitchRef.current = false;
+      start();
+    }
+  }, [facingMode, start]);
+
+  const switchFacingMode = (mode) => {
+    if (mode === facingMode) return;
+    restartAfterSwitchRef.current = isActive;
+    if (isActive) stop();
+    setFacingMode(mode);
+  };
 
   // Run the quality check a couple of times per second while the camera is on.
   useEffect(() => {
@@ -101,9 +117,25 @@ export function FaceCapture({ title, instruction, onCapture, onRetake, disabled 
 
   return (
     <div className="space-y-2">
-      <div className="flex items-baseline justify-between gap-2">
+      <div className="flex flex-wrap items-center justify-between gap-2">
         <p className="text-xs font-semibold text-slate-800">{title}</p>
-        {instruction && <p className="text-[11px] text-slate-500">{instruction}</p>}
+        <div className="flex items-center gap-2">
+          {instruction && <p className="text-[11px] text-slate-500">{instruction}</p>}
+          <div className="inline-flex rounded-lg border border-slate-200 bg-slate-50 p-0.5" aria-label="Choose camera">
+            {[['user', 'Front'], ['environment', 'Back']].map(([mode, label]) => (
+              <button
+                key={mode}
+                type="button"
+                onClick={() => switchFacingMode(mode)}
+                disabled={disabled || capturing || Boolean(captured)}
+                aria-pressed={facingMode === mode}
+                className={`px-2 py-1 rounded-md text-[11px] font-semibold transition-colors disabled:opacity-50 ${facingMode === mode ? 'bg-slate-900 text-white' : 'text-slate-600 hover:bg-white'}`}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="relative rounded-xl overflow-hidden bg-black aspect-4/3 w-full border border-slate-800">

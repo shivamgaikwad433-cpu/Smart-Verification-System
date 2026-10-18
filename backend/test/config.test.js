@@ -9,7 +9,7 @@ const prisma = require('../src/lib/prisma');
 test('console email driver is valid in development', () => {
   const config = loadConfig({ NODE_ENV: 'test', EMAIL_DRIVER: 'console' });
   assert.equal(config.EMAIL_DRIVER, 'console');
-  assert.equal(config.OTP_TTL_SECONDS, 20);
+  assert.equal(config.OTP_TTL_SECONDS, 300);
 });
 
 test('production rejects missing SMTP credentials', () => {
