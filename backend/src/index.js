@@ -90,7 +90,7 @@ app.use((req, res) => res.status(404).json({ success: false, message: `Route ${r
 app.use(errorHandler);
 
 // -- Start ----------------------------------------------------------------------
-app.listen(PORT, () => {
+app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n?? Smart Verification System API`);
   console.log(`   Health: http://localhost:${PORT}/api/health`);
   console.log(`   Docs:   http://localhost:${PORT}/docs\n`);
