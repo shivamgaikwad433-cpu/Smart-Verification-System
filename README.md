@@ -1,24 +1,58 @@
-<<<<<<< HEAD
-<<<<<<< HEAD
-# React + Vite
+﻿# Smart Verification System
 
-This template provides a minimal setup to get React working in Vite with HMR and some Oxlint rules.
+React (Vite) frontend with a Node.js/Express API. The backend serves the built frontend when both are deployed as one Railway service. A separate frontend deployment can target the backend using `VITE_API_URL`.
 
-Currently, two official plugins are available:
+## Local development
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+Copy `backend/.env.example` to `backend/.env` and `.env.example` to `.env.local`, fill in local credentials as needed, and run `npm install`, `npm --prefix backend install`, then `npm run dev`. The API listens on the Railway `PORT` value or port `8080` by default. Vite proxies `/api` to `http://localhost:8080` for local development.
 
-## React Compiler
+## Railway deployment checklist
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+### Backend service variables
 
-## Expanding the Oxlint configuration
+Set these in the Railway backend service. Keep all credentials in Railway Variables; do not commit them.
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and Oxlint's TypeScript related rules in your project.
-=======
-# Smart-Verification-System
->>>>>>> a7b395e1b109534b73617565a256c0cc571600b2
-=======
-# Smart-Verification-System
->>>>>>> a28c26b14595b5ee558d72dd355c712a6cf184d8
+- `DATABASE_URL`: production database connection string (the current Prisma schema may require a compatible SQLite file and persistent volume).
+- `JWT_SECRET`, `JWT_REFRESH_SECRET`, `OTP_SECRET`, `EMAIL_PROOF_SECRET`: long, unique random secrets.
+- `EMAIL_DRIVER=resend`
+- `RESEND_API_KEY`: your Resend API key.
+- `RESEND_FROM_EMAIL=onboarding@resend.dev` for Resend testing, or a verified sender/domain for production.
+- `FRONTEND_URL`: exact public frontend origin, such as `https://your-frontend.up.railway.app` (no trailing slash or path).
+- `PORT`: let Railway inject this value. For a local `.env`, `8080` is the default.
+- `APP_URL`: public frontend URL, used in approval email links.
+
+`backend/.env.example` lists the backend variables. Railway must build and start from the repository root using the commands in `railway.json`.
+
+### Frontend service variable
+
+For the Netlify frontend, set `VITE_API_URL=/api/v1` (also shown in the root `.env.example`). Netlify forwards `/api/*` to the public Railway backend URL configured in `netlify.toml`, so the browser can use a same-origin path and does not need a hardcoded Railway hostname. If you deploy the frontend somewhere without this proxy, set `VITE_API_URL` to the backend public URL plus `/api/v1` and set backend `FRONTEND_URL` to that frontend's exact public origin.
+
+Do not put secrets in frontend variables. The backend public host is configured in `netlify.toml`; change that redirect target if the Railway domain changes.
+
+### Public domain and networking
+
+In Railway, open the backend service's **Settings → Networking → Public Networking** and choose **Generate Domain**. Set `FRONTEND_URL` on the backend to the frontend's public origin. The server listens on `process.env.PORT` and binds to `0.0.0.0`; if Railway asks for a target port, set it to the same port value the service receives in `PORT` (use `8080` only when you explicitly configure `PORT=8080`).
+
+### Deployment smoke checks
+
+Replace `<backend-domain>` with the generated HTTPS domain. A successful health request returns JSON with `success: true`:
+
+```sh
+curl -i https://<backend-domain>/api/health
+```
+
+Send an OTP with POST and JSON. The canonical API route is `/api/v1/auth/otp/send`; `/api/auth/send-otp` is also available as a short compatibility path. A successful response includes `success: true`; delivery/configuration failures return JSON with `success: false` and a message.
+
+```sh
+curl -i -X POST https://<backend-domain>/api/auth/send-otp \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","purpose":"EMAIL_VERIFY"}'
+```
+
+Test password login with POST. The canonical path is `/api/v1/auth/login`; `/api/auth/login` is also supported. A valid account returns token data; invalid credentials return a JSON error response (typically HTTP 401), which confirms the route and method are reachable.
+
+```sh
+curl -i -X POST https://<backend-domain>/api/auth/login \
+  -H "Content-Type: application/json" \
+  -d '{"email":"you@example.com","password":"your-password"}'
+```

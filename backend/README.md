@@ -31,4 +31,4 @@ The backend can serve the frontend build from the root `dist/` folder. Configure
 
 Set `DATABASE_URL` to a SQLite file on the host's persistent disk (for example, `file:/var/data/dev.db`), `APP_URL` to the public HTTPS site URL, and configure the email provider variables above. The host must preserve the mounted database file between restarts. `APP_URL` is used to add a direct link to the HOD approval dashboard in notification emails. The HOD approval email is stored in the `SystemSetting` table and defaults to the configured address in `approvalRouting.service.js`.
 
-For a separate frontend and backend deployment, set the frontend build variable `VITE_API_URL` to the backend's public `/api/v1` URL and set backend `CORS_ORIGIN` to the frontend's public origin.
+For the Netlify frontend, set `VITE_API_URL=/api/v1`; `netlify.toml` forwards API traffic to the Railway public domain. For a frontend hosted without that proxy, set `VITE_API_URL` to the backend public URL ending in `/api/v1` and set backend `FRONTEND_URL` to the frontend's exact public origin. Localhost values in the Vite proxy and backend CORS fallback are for local development only.

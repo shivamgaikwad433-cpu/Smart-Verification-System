@@ -25,7 +25,7 @@ const { loadModels } = require('./services/faceEngine.service');
 
 const app    = express();
 const prisma = new PrismaClient();
-const PORT   = process.env.PORT || 5000;
+const PORT   = process.env.PORT || 8080;
 const config = loadConfig();
 
 loadModels().catch((err) => console.warn('[FaceEngine] Preload warning:', err.message));
@@ -43,11 +43,10 @@ otpCleanup.unref();
 
 // -- Global middleware ----------------------------------------------------------
 app.use(helmet());
-const allowedOrigins = (process.env.CORS_ORIGIN || 'http://localhost:5173,http://127.0.0.1:5173')
-  .split(',').map((origin) => origin.trim()).filter(Boolean);
+const allowedOrigin = (process.env.FRONTEND_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : '')).trim();
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.includes(origin)) return callback(null, true);
+    if (!origin || origin === allowedOrigin) return callback(null, true);
     return callback(new Error('Origin not allowed by CORS'));
   },
   credentials: true,
@@ -64,6 +63,8 @@ app.use('/docs', swaggerUi.serve, swaggerUi.setup(swaggerDoc));
 
 // -- Routes ---------------------------------------------------------------------
 app.use('/api/v1/auth',         authRoutes);
+// Keep the short auth prefix available for direct deployment health checks and older clients.
+app.use('/api/auth',             authRoutes);
 app.use('/api/v1/users',        userRoutes);
 app.use('/api/v1/photos',       photoRoutes);
 app.use('/api/v1/verification', verificationRoutes);
@@ -92,8 +93,9 @@ app.use(errorHandler);
 // -- Start ----------------------------------------------------------------------
 app.listen(PORT, '0.0.0.0', () => {
   console.log(`\n?? Smart Verification System API`);
-  console.log(`   Health: http://localhost:${PORT}/api/health`);
-  console.log(`   Docs:   http://localhost:${PORT}/docs\n`);
+  console.log(`   Listening on 0.0.0.0:${PORT}`);
+  console.log(`   Health: /api/health`);
+  console.log(`   Docs:   /docs\n`);
 });
 
 module.exports = app;

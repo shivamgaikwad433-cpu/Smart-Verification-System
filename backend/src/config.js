@@ -8,6 +8,7 @@ const schema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
   EMAIL_DRIVER: z.enum(['smtp', 'console', 'resend']).default('resend'),
   RESEND_API_KEY: z.string().default(process.env.RESEND_API_KEY || ''),
+  RESEND_FROM_EMAIL: z.string().transform((value) => value.trim()).optional(),
   EMAIL_HOST: z.string().default('smtp.gmail.com'),
   EMAIL_PORT: z.coerce.number().int().positive().default(465),
   EMAIL_SECURE: z.preprocess((val) => {
@@ -43,6 +44,7 @@ function loadConfig(env = process.env) {
   return {
     ...config,
     EMAIL_FROM: config.EMAIL_FROM || config.EMAIL_USER,
+    RESEND_FROM_EMAIL: config.RESEND_FROM_EMAIL || 'onboarding@resend.dev',
     missingEmailVariables: missing,
     envPath: ENV_PATH,
     envFileExists: fs.existsSync(ENV_PATH),

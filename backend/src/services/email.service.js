@@ -35,12 +35,11 @@ function getTransporter(config = {}) {
 async function sendViaResend(to, subject, html, config = {}) {
   const apiKey = (config.RESEND_API_KEY || process.env.RESEND_API_KEY || '').trim();
   if (!apiKey) {
-    throw Object.assign(new Error('RESEND_API_KEY is not configured in backend/.env'), { status: 503, code: 'EMAIL_NOT_CONFIGURED' });
+    throw Object.assign(new Error('RESEND_API_KEY is not configured in the backend environment'), { status: 503, code: 'EMAIL_NOT_CONFIGURED' });
   }
 
-  const from = config.EMAIL_FROM && !config.EMAIL_FROM.includes('@gmail.com')
-    ? config.EMAIL_FROM
-    : 'Smart Verification <onboarding@resend.dev>';
+  const sender = (config.RESEND_FROM_EMAIL || process.env.RESEND_FROM_EMAIL || 'onboarding@resend.dev').trim();
+  const from = sender.includes('<') ? sender : `Smart Verification <${sender}>`;
 
   const response = await fetch('https://api.resend.com/emails', {
     method: 'POST',
