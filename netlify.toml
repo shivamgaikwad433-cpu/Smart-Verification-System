@@ -2,15 +2,15 @@
   command = "npm run build"
   publish = "dist"
 
-# Proxy all /api requests to the Railway backend.
-# 'force = true' ensures Netlify sends these requests even if a matching static file exists.
+# Proxy all /api requests to the Render.com backend.
+# UPDATE: Replace the Render URL below after creating your Render service.
 [[redirects]]
   from = "/api/*"
-  to = "https://smart-verification-system-production.up.railway.app/api/:splat"
+  to = "https://smart-verification-api.onrender.com/api/:splat"
   status = 200
   force = true
   [redirects.headers]
-    X-Forwarded-Host = "smart-verification-system-production.up.railway.app"
+    X-Forwarded-Host = "smart-verification-api.onrender.com"
 
 # SPA fallback — all other routes serve index.html for React Router.
 [[redirects]]

@@ -1,0 +1,49 @@
+services:
+  - type: web
+    name: smart-verification-api
+    runtime: node
+    region: oregon
+    plan: free
+    rootDir: backend
+    buildCommand: npm ci && npx prisma generate --schema prisma/schema.prisma
+    startCommand: node src/index.js
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: FRONTEND_URL
+        value: https://smart-verification-system.netlify.app
+      - key: DATABASE_URL
+        value: file:./prisma/dev.db
+      - key: PORT
+        value: 10000
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
+      - key: OTP_SECRET
+        generateValue: true
+      - key: EMAIL_PROOF_SECRET
+        generateValue: true
+      - key: EMAIL_DRIVER
+        value: smtp
+      - key: EMAIL_HOST
+        value: smtp.gmail.com
+      - key: EMAIL_PORT
+        value: "465"
+      - key: EMAIL_SECURE
+        value: "true"
+      - key: EMAIL_USER
+        sync: false
+      - key: EMAIL_PASS
+        sync: false
+      - key: EMAIL_FROM
+        sync: false
+      - key: OTP_TTL_SECONDS
+        value: "300"
+      - key: OTP_RESEND_COOLDOWN_SECONDS
+        value: "30"
+      - key: OTP_MAX_ATTEMPTS
+        value: "5"
+      - key: OTP_MAX_SENDS_PER_HOUR
+        value: "10"
