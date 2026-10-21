@@ -43,10 +43,24 @@ otpCleanup.unref();
 
 // -- Global middleware ----------------------------------------------------------
 app.use(helmet());
-const allowedOrigin = (process.env.FRONTEND_URL || (process.env.NODE_ENV !== 'production' ? 'http://localhost:5173' : '')).trim();
+// Support multiple allowed origins via comma-separated FRONTEND_URL.
+// Always allow same-origin requests (origin is undefined for Netlify proxy).
+const allowedOrigins = (() => {
+  const origins = new Set();
+  const envUrl = (process.env.FRONTEND_URL || '').trim();
+  if (envUrl) envUrl.split(',').forEach((u) => origins.add(u.trim()));
+  if (process.env.NODE_ENV !== 'production') {
+    origins.add('http://localhost:5173');
+    origins.add('http://localhost:3000');
+  }
+  return origins;
+})();
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || origin === allowedOrigin) return callback(null, true);
+    // Allow requests with no origin (same-origin, Netlify proxy, curl, mobile apps)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.has(origin)) return callback(null, true);
+    console.warn(`[CORS] Blocked origin: ${origin}`);
     return callback(new Error('Origin not allowed by CORS'));
   },
   credentials: true,

@@ -2,13 +2,26 @@
   command = "npm run build"
   publish = "dist"
 
+# Proxy all /api requests to the Railway backend.
+# 'force = true' ensures Netlify sends these requests even if a matching static file exists.
 [[redirects]]
   from = "/api/*"
   to = "https://smart-verification-system-production.up.railway.app/api/:splat"
   status = 200
   force = true
+  [redirects.headers]
+    X-Forwarded-Host = "smart-verification-system-production.up.railway.app"
 
+# SPA fallback — all other routes serve index.html for React Router.
 [[redirects]]
   from = "/*"
   to = "/index.html"
   status = 200
+
+# Security & caching headers for all pages.
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options = "DENY"
+    X-Content-Type-Options = "nosniff"
+    Referrer-Policy = "strict-origin-when-cross-origin"
