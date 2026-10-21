@@ -25,3 +25,8 @@
     X-Frame-Options = "DENY"
     X-Content-Type-Options = "nosniff"
     Referrer-Policy = "strict-origin-when-cross-origin"
+
+
+[[redirects]]
+  from = "/api/*"
+  to = " https://smart-verification-system.onrender.com/api/:splat"
